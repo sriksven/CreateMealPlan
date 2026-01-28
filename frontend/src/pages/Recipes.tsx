@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChefHat, Clock, Flame } from 'lucide-react';
+import { Clock, Flame } from 'lucide-react';
 
 const Recipes: React.FC = () => {
     const recipes = [

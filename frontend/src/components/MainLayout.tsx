@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { ChefHat, ShoppingBasket, ScanLine, User, UtensilsCrossed } from 'lucide-react';
+import { ShoppingBasket, ScanLine, User, UtensilsCrossed } from 'lucide-react';
 
 const MainLayout: React.FC = () => {
     const location = useLocation();
