@@ -6,6 +6,7 @@ import ReceiptScanner from './pages/ReceiptScanner';
 import Profile from './pages/Profile';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import LandingPage from './pages/LandingPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 
@@ -16,28 +17,28 @@ function App() {
         <Routes>
 
           {/* Public Routes */}
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
 
-          {/* Protected App */}
+          {/* Protected App Routes */}
           <Route
-            path="/"
             element={
               <ProtectedRoute>
                 <MainLayout />
               </ProtectedRoute>
             }
           >
-            <Route index element={<Navigate to="/recipes" replace />} />
+            <Route path="/recipes" element={<Recipes />} />
+            <Route path="/pantry" element={<MyPantry />} />
+            <Route path="/scanner" element={<ReceiptScanner />} />
+            <Route path="/profile" element={<Profile />} />
 
-            <Route path="recipes" element={<Recipes />} />
-            <Route path="pantry" element={<MyPantry />} />
-            <Route path="scanner" element={<ReceiptScanner />} />
-            <Route path="profile" element={<Profile />} />
-
-            <Route path="dashboard" element={<Navigate to="/pantry" replace />} />
-            <Route path="*" element={<div className="p-10 text-center">Page Not Found</div>} />
+            {/* Redirect old dashboard link or default authenticated view */}
+            <Route path="/dashboard" element={<Navigate to="/pantry" replace />} />
           </Route>
+
+          <Route path="*" element={<div className="p-10 text-center text-red-500">Page Not Found</div>} />
 
         </Routes>
       </Router>

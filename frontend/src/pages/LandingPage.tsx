@@ -1,61 +1,75 @@
-import React from 'react';
-import { ArrowRight, ScanLine, Utensils } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import React from "react";
+import { Link } from "react-router-dom";
 
 const LandingPage: React.FC = () => {
     return (
-        <div className="text-center" style={{ maxWidth: '800px', margin: '0 auto' }}>
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8 }}
-            >
-                <div className="badge">
-                    AI-Powered Kitchen Assistant
+        <div className="landing-page">
+            {/* Background Elements */}
+            <div className="landing-bg">
+                <div className="blob blob-blue" />
+                <div className="blob blob-purple" />
+            </div>
+
+            {/* Header */}
+            <header className="app-header">
+                <div className="logo-area">
+                    <span className="text-2xl">CreateMealPlan</span>
                 </div>
+                <nav className="nav-actions">
+                    <Link to="/login" className="btn btn-primary btn-sm">
+                        Login
+                    </Link>
+                </nav>
+            </header>
 
-                <h1 className="text-hero">
-                    Your Kitchen, <br />
-                    <span className="text-gradient">Intelligently Managed.</span>
-                </h1>
+            {/* Hero Section */}
+            <main className="landing-main">
+                <div className="hero-content animate-fade-in-up">
+                    <span className="badge">AI-Powered Kitchen Assistant</span>
 
-                <p className="text-xl text-muted" style={{ marginBottom: '3rem', lineHeight: '1.6' }}>
-                    Stop guessing what to cook. Track your pantry with AI vision and generate high-protein meal plans based on what you actually own.
-                </p>
+                    <h1 className="text-hero leading-tight">
+                        Turn Your Pantry <br />
+                        Into <span className="text-gradient">Perfect Meals</span>
+                    </h1>
 
-                <div className="flex justify-center gap-4" style={{ marginBottom: '5rem' }}>
-                    <Link to="/signup">
-                        <button className="btn btn-primary">
+                    <p className="text-xl text-muted description">
+                        Stop wasting food. Scan your receipts, track your pantry, and generate high-protein meal plans instantly with Gemini AI.
+                    </p>
+
+                    <div className="cta-group">
+                        <Link to="/login" className="btn btn-primary btn-lg">
                             Get Started Free
-                        </button>
-                    </Link>
-                    <Link to="/demo">
-                        <button className="btn btn-secondary">
-                            Watch Demo
-                        </button>
-                    </Link>
-                </div>
-            </motion.div>
-
-            <motion.div
-                initial={{ opacity: 0, marginTop: 40 }}
-                animate={{ opacity: 1, marginTop: 80 }}
-                transition={{ delay: 0.4, duration: 0.8 }}
-                className="grid grid-cols-1 grid-cols-3"
-            >
-                {[
-                    { icon: ScanLine, title: "Snap & Track", desc: "Take a photo of your groceries. Our AI instantly catalogs them." },
-                    { icon: Utensils, title: "Smart Recipes", desc: "Get recipes tailored to your ingredients and protein goals." },
-                    { icon: ArrowRight, title: "Zero Waste", desc: "Use what you have before it expires. Save money and the planet." }
-                ].map((item, index) => (
-                    <div key={index} className="glass-panel" style={{ textAlign: 'left' }}>
-                        <item.icon color="var(--accent-primary)" size={40} style={{ marginBottom: '1.5rem' }} />
-                        <h3 className="text-xl" style={{ marginBottom: '0.5rem' }}>{item.title}</h3>
-                        <p className="text-muted">{item.desc}</p>
+                        </Link>
+                        <a href="#how-it-works" className="btn btn-secondary btn-lg">
+                            How it Works
+                        </a>
                     </div>
-                ))}
-            </motion.div>
+                </div>
+
+                {/* Feature Grid Mockup */}
+                <div id="how-it-works" className="features-grid">
+                    <div className="glass-panel feature-card">
+                        <div className="feature-icon">📸</div>
+                        <h3 className="text-xl mb-2">Smart Scanning</h3>
+                        <p className="text-muted">Snap a photo of your receipt. Our AI extracts existing ingredients and updates your pantry automatically.</p>
+                    </div>
+                    <div className="glass-panel feature-card">
+                        <div className="feature-icon">🥗</div>
+                        <h3 className="text-xl mb-2">Macro Tracking</h3>
+                        <p className="text-muted">We prioritize your health. All generated recipes are optimized for your daily protein goals.</p>
+                    </div>
+                    <div className="glass-panel feature-card">
+                        <div className="feature-icon">✨</div>
+                        <h3 className="text-xl mb-2">AI Chef</h3>
+                        <p className="text-muted">Don't know what to cook? Get creative recipes based strictly on what you have at home.</p>
+                    </div>
+                </div>
+            </main>
+
+            {/* Footer */}
+            <footer className="landing-footer">
+                <p>© {new Date().getFullYear()} CreateMealPlan. Powered by Gemini.</p>
+            </footer>
         </div>
     );
 };

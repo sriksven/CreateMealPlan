@@ -1,9 +1,11 @@
 import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { ShoppingBasket, ScanLine, User, UtensilsCrossed } from 'lucide-react';
+import { ShoppingBasket, ScanLine, User, UtensilsCrossed, LogOut } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const MainLayout: React.FC = () => {
     const location = useLocation();
+    const { user, logout } = useAuth();
 
     const isActive = (path: string) => location.pathname === path ? 'active' : '';
 
@@ -39,8 +41,18 @@ const MainLayout: React.FC = () => {
                 </nav>
 
                 <div className="flex items-center gap-4">
-                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <User size={16} className="text-muted" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className="text-sm text-muted hidden-mobile">
+                            {user?.email?.split('@')[0]}
+                        </span>
+                        <button
+                            onClick={() => logout()}
+                            className="btn btn-secondary btn-sm"
+                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', gap: '0.4rem' }}
+                        >
+                            <LogOut size={14} />
+                            Logout
+                        </button>
                     </div>
                 </div>
             </header>

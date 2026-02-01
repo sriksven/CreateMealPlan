@@ -151,6 +151,7 @@ ul {
   gap: var(--spacing-lg);
 }
 
+/* Grid System */
 .grid {
   display: grid;
   gap: var(--spacing-lg);
@@ -170,34 +171,6 @@ ul {
   }
 }
 
-.hidden-mobile {
-  display: none;
-}
-
-@media (min-width: 768px) {
-  .hidden-mobile {
-    display: flex;
-  }
-}
-
-/* Mobile Nav Handling */
-nav.glass-panel {
-  display: flex !important;
-}
-
-@media (min-width: 768px) {
-  nav.glass-panel {
-    display: none !important;
-  }
-}
-
-.w-full {
-  width: 100%;
-}
-
-.mt-big {
-  margin-top: var(--spacing-xl);
-}
 
 /* Components */
 
@@ -219,6 +192,15 @@ nav.glass-panel {
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--spacing-lg);
+}
+
+/* Main Layout Content Padding (Important to prevent overlap) */
+.page-content {
+  padding-top: 100px;
+  /* Header is 60px + 40px spacing */
+  padding-bottom: 100px;
+  /* For mobile nav + spacing */
+  flex-grow: 1;
 }
 
 .logo-area {
@@ -253,6 +235,7 @@ nav.glass-panel {
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--spacing-sm);
   padding: 0.75rem 1.5rem;
   border-radius: var(--radius-md);
@@ -262,6 +245,7 @@ nav.glass-panel {
   transition: all 0.2s ease;
   border: none;
   font-family: inherit;
+  white-space: nowrap;
 }
 
 .btn-primary {
@@ -293,6 +277,11 @@ nav.glass-panel {
   border-radius: var(--radius-sm);
 }
 
+.btn-lg {
+  padding: 1rem 2rem;
+  font-size: 1.125rem;
+}
+
 /* Cards / Glass Panels */
 .glass-panel {
   background: var(--glass-bg);
@@ -306,15 +295,6 @@ nav.glass-panel {
   border-color: rgba(255, 255, 255, 0.2);
 }
 
-/* Pages */
-.page-content {
-  padding-top: 80px;
-  /* Header height + spacing */
-  padding-bottom: 100px;
-  /* For mobile nav */
-  flex-grow: 1;
-}
-
 /* Inputs */
 .input-field {
   width: 100%;
@@ -325,6 +305,7 @@ nav.glass-panel {
   border-radius: var(--radius-sm);
   font-size: 1rem;
   transition: border-color 0.2s;
+  box-sizing: border-box;
 }
 
 .input-field:focus {
@@ -351,4 +332,133 @@ nav.glass-panel {
   color: var(--accent-primary);
   border: 1px solid rgba(59, 130, 246, 0.2);
   margin-bottom: var(--spacing-md);
+}
+
+/* LANDING PAGE SPECIFIC STYLES */
+
+.landing-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+.landing-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.blob {
+  position: absolute;
+  width: 50vw;
+  height: 50vw;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.15;
+}
+
+.blob-blue {
+  top: -20%;
+  left: -10%;
+  background: var(--accent-primary);
+}
+
+.blob-purple {
+  bottom: -20%;
+  right: -10%;
+  background: var(--accent-secondary);
+}
+
+.landing-main {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 80px var(--spacing-lg) 40px;
+}
+
+.hero-content {
+  max-width: 800px;
+  margin: 0 auto;
+  margin-bottom: 5rem;
+}
+
+.description {
+  margin: 0 auto 2rem;
+  max-width: 600px;
+}
+
+.cta-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  justify-content: center;
+}
+
+@media (min-width: 640px) {
+  .cta-group {
+    flex-direction: row;
+  }
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-lg);
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+@media (min-width: 768px) {
+  .features-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.feature-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.feature-icon {
+  font-size: 2.5rem;
+  margin-bottom: var(--spacing-md);
+}
+
+.landing-footer {
+  border-top: 1px solid var(--glass-border);
+  padding: var(--spacing-lg);
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s ease-out forwards;
 }

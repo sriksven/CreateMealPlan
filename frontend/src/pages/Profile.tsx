@@ -78,17 +78,9 @@ const Profile: React.FC = () => {
             justifyContent: 'center'
           }}
         >
-          {user?.photoURL ? (
-            <img
-              src={user.photoURL}
-              alt="profile"
-              style={{ width: '100%', height: '100%', borderRadius: '50%' }}
-            />
-          ) : (
-            <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white' }}>
-              {user?.displayName?.[0] ?? 'U'}
-            </span>
-          )}
+          <span style={{ fontSize: '2rem', fontWeight: 'bold', color: 'white', textTransform: 'uppercase' }}>
+            {user?.displayName?.[0] ?? user?.email?.[0] ?? 'U'}
+          </span>
         </div>
         <div>
           <h2 className="text-2xl">{user?.displayName ?? 'User'}</h2>
