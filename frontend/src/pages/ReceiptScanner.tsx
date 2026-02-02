@@ -1,25 +1,108 @@
 import React, { useState, useRef } from "react";
 import { auth } from "../firebase";
 import { API_BASE_URL } from "../config";
-import { Camera, Upload, X, Check } from "lucide-react";
+import { Camera, Upload, X, Check, Edit2, Trash2 } from "lucide-react";
+
+interface ScannedItem {
+  name: string;
+  quantity: string;
+  unit: string;
+  count?: string;
+}
 
 const ReceiptScanner: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [scannedItems, setScannedItems] = useState<ScannedItem[]>([]);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Detect if device is mobile
+  const isMobileDevice = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    ) || window.innerWidth <= 768;
+  };
 
   // Trigger File Upload
   const handleUploadClick = () => {
     if (fileInputRef.current) fileInputRef.current.click();
   };
 
-  // Trigger Camera
-  const handleCameraClick = () => {
-    if (cameraInputRef.current) cameraInputRef.current.click();
+  // Open Camera - choose method based on device
+  const handleCameraClick = async () => {
+    // On mobile, use native camera input
+    if (isMobileDevice()) {
+      if (cameraInputRef.current) cameraInputRef.current.click();
+      return;
+    }
+
+    // On desktop, use WebRTC
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+      setStream(mediaStream);
+      setIsCameraOpen(true);
+      
+      // Wait a bit for state to update, then attach stream
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStream;
+        }
+      }, 100);
+    } catch (error) {
+      console.error("Camera access error:", error);
+      setMessage("error|Unable to access camera. Please check permissions.");
+      // Fallback to file input
+      if (cameraInputRef.current) cameraInputRef.current.click();
+    }
+  };
+
+  // Capture photo from camera
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(video, 0, 0);
+        
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const file = new File([blob], "camera-photo.jpg", { type: "image/jpeg" });
+            setFile(file);
+            setPreview(URL.createObjectURL(blob));
+            closeCamera();
+          }
+        }, "image/jpeg", 0.9);
+      }
+    }
+  };
+
+  // Close camera stream
+  const closeCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setIsCameraOpen(false);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -35,6 +118,9 @@ const ReceiptScanner: React.FC = () => {
     setFile(null);
     setPreview(null);
     setMessage("");
+    setScannedItems([]);
+    setEditingIndex(null);
+    closeCamera();
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
@@ -68,9 +154,8 @@ const ReceiptScanner: React.FC = () => {
       }
 
       const data = await res.json();
-      setMessage(`success|Added ${data.items.length} items to your pantry!`);
-      setFile(null); // Clear after success
-      setPreview(null);
+      setScannedItems(data.items || []);
+      setMessage(`success|Found ${data.items.length} items! Review and save to pantry.`);
     } catch (err) {
       console.error(err);
       setMessage("error|Failed to scan receipt. Please try again.");
@@ -79,16 +164,60 @@ const ReceiptScanner: React.FC = () => {
     }
   };
 
+  const handleSaveItems = async () => {
+    if (scannedItems.length === 0) return;
+
+    setLoading(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error("User not authenticated");
+
+      const res = await fetch(`${API_BASE_URL}/api/pantry/items`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ items: scannedItems }),
+      });
+
+      if (!res.ok) throw new Error("Failed to save items");
+
+      setMessage(`success|Added ${scannedItems.length} items to your pantry!`);
+      setTimeout(() => {
+        clearSelection();
+      }, 2000);
+    } catch (err) {
+      console.error(err);
+      setMessage("error|Failed to save items. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateItem = (index: number, field: keyof ScannedItem, value: string) => {
+    const updated = [...scannedItems];
+    updated[index] = { ...updated[index], [field]: value };
+    setScannedItems(updated);
+  };
+
+  const deleteItem = (index: number) => {
+    setScannedItems(scannedItems.filter((_, i) => i !== index));
+  };
+
   const isSuccess = message.startsWith("success|");
   const displayMessage = message.split("|")[1] || message;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[80vh] w-full">
-      <div className="glass-panel w-full max-w-lg p-8 animate-fade-in-up">
-        <h2 className="text-2xl font-bold mb-2 text-center">Scan Receipt</h2>
-        <p className="text-muted text-center mb-8">
-          Take a photo or upload a receipt to auto-add items.
-        </p>
+    <div>
+      <div className="flex justify-between items-center" style={{ marginBottom: '2rem' }}>
+        <div>
+          <h1 className="text-2xl" style={{ marginBottom: '0.5rem' }}>Scan Receipt</h1>
+          <p className="text-muted">Take a photo or upload a receipt to auto-add items.</p>
+        </div>
+      </div>
+
+      <div className="glass-panel" style={{ maxWidth: '800px', margin: '0 auto' }}>
 
         {/* Hidden Inputs */}
         <input
@@ -109,42 +238,89 @@ const ReceiptScanner: React.FC = () => {
           style={{ display: "none" }}
         />
 
-        {/* Preview Area */}
-        {preview ? (
-          <div className="relative w-full h-64 bg-black/50 rounded-lg overflow-hidden mb-6 border border-[var(--glass-border)]">
+        {/* Hidden canvas for capturing photos */}
+        <canvas ref={canvasRef} style={{ display: "none" }} />
+
+        {/* Camera View */}
+        {isCameraOpen ? (
+          <div style={{ position: 'relative', width: '100%', backgroundColor: '#000', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: '1.5rem', border: '1px solid var(--glass-border)' }}>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{ width: '100%', minHeight: '400px', maxHeight: '500px', objectFit: 'cover' }}
+              onLoadedMetadata={() => {
+                if (videoRef.current) {
+                  videoRef.current.play();
+                }
+              }}
+            />
+            <div style={{ position: 'absolute', bottom: '1rem', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '1rem', padding: '0 1rem' }}>
+              <button
+                onClick={capturePhoto}
+                className="btn btn-primary"
+                style={{ gap: '0.5rem' }}
+              >
+                <Camera size={20} />
+                Capture Photo
+              </button>
+              <button
+                onClick={closeCamera}
+                className="btn"
+                style={{ gap: '0.5rem', backgroundColor: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.3)', color: 'var(--danger)' }}
+              >
+                <X size={20} />
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : preview ? (
+          <div style={{ position: 'relative', width: '100%', height: '400px', backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: '1.5rem', border: '1px solid var(--glass-border)' }}>
             <img
               src={preview}
               alt="Preview"
-              className="w-full h-full object-contain"
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
             />
             <button
               onClick={clearSelection}
-              className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-full hover:bg-black/80 transition-colors"
+              style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              className="hover-scale"
             >
               <X size={20} color="white" />
             </button>
           </div>
         ) : (
-          <div className="flex flex-col gap-4 mb-8">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
             {/* Big Camera Action */}
             <button
               onClick={handleCameraClick}
-              className="btn btn-primary text-lg py-4 flex-col gap-2 h-32 border-2 border-[var(--accent-primary)] bg-[rgba(59,130,246,0.1)] hover:bg-[rgba(59,130,246,0.2)]"
+              className="btn btn-primary"
+              style={{ 
+                fontSize: '1.125rem', 
+                padding: '2rem', 
+                flexDirection: 'column', 
+                gap: '0.75rem', 
+                height: 'auto',
+                border: '2px solid var(--accent-primary)',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)'
+              }}
             >
               <Camera size={40} />
               <span>Open Camera</span>
             </button>
 
-            <div className="flex items-center gap-4">
-              <div className="h-[1px] bg-[var(--glass-border)] flex-1"></div>
-              <span className="text-sm text-muted">OR</span>
-              <div className="h-[1px] bg-[var(--glass-border)] flex-1"></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ height: '1px', backgroundColor: 'var(--glass-border)', flex: 1 }}></div>
+              <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>OR</span>
+              <div style={{ height: '1px', backgroundColor: 'var(--glass-border)', flex: 1 }}></div>
             </div>
 
             {/* Upload Action */}
             <button
               onClick={handleUploadClick}
-              className="btn btn-secondary py-3"
+              className="btn btn-secondary"
+              style={{ gap: '0.5rem' }}
             >
               <Upload size={20} />
               <span>Upload from Gallery</span>
@@ -153,9 +329,10 @@ const ReceiptScanner: React.FC = () => {
         )}
 
         {/* Scan Action */}
-        {file && (
+        {file && scannedItems.length === 0 && (
           <button
-            className="btn btn-primary w-full text-lg py-3 mb-4"
+            className="btn btn-primary"
+            style={{ width: '100%', fontSize: '1.125rem', marginBottom: '1rem' }}
             onClick={handleScan}
             disabled={loading}
           >
@@ -163,9 +340,120 @@ const ReceiptScanner: React.FC = () => {
           </button>
         )}
 
+        {/* Scanned Items List */}
+        {scannedItems.length > 0 && (
+          <div style={{ marginBottom: '1.5rem' }}>
+            <h3 className="text-xl" style={{ marginBottom: '1rem' }}>Scanned Items ({scannedItems.length})</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '400px', overflowY: 'auto' }}>
+              {scannedItems.map((item, index) => (
+                <div
+                  key={index}
+                  className="glass-panel"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem' }}
+                >
+                  {editingIndex === index ? (
+                    <>
+                      <input
+                        type="text"
+                        value={item.name}
+                        onChange={(e) => updateItem(index, "name", e.target.value)}
+                        className="input-field"
+                        style={{ flex: 1 }}
+                        placeholder="Item name"
+                      />
+                      <input
+                        type="text"
+                        value={item.quantity}
+                        onChange={(e) => updateItem(index, "quantity", e.target.value)}
+                        className="input-field"
+                        style={{ width: '80px' }}
+                        placeholder="Qty"
+                      />
+                      <input
+                        type="text"
+                        value={item.unit}
+                        onChange={(e) => updateItem(index, "unit", e.target.value)}
+                        className="input-field"
+                        style={{ width: '80px' }}
+                        placeholder="Unit"
+                      />
+                      <input
+                        type="text"
+                        value={item.count || ''}
+                        onChange={(e) => updateItem(index, "count", e.target.value)}
+                        className="input-field"
+                        style={{ width: '70px' }}
+                        placeholder="Count"
+                      />
+                      <button
+                        onClick={() => setEditingIndex(null)}
+                        className="btn btn-sm"
+                        style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', border: '1px solid rgba(16, 185, 129, 0.3)', color: 'var(--success)', padding: '0.5rem' }}
+                      >
+                        <Check size={18} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{item.name}</div>
+                        <div className="text-muted" style={{ fontSize: '0.875rem' }}>
+                          {item.quantity} {item.unit}{item.count ? ` • ${item.count} count` : ''}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setEditingIndex(index)}
+                        className="btn btn-sm"
+                        style={{ padding: '0.5rem' }}
+                      >
+                        <Edit2 size={18} />
+                      </button>
+                      <button
+                        onClick={() => deleteItem(index)}
+                        className="btn btn-sm"
+                        style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.3)', color: 'var(--danger)', padding: '0.5rem' }}
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+              <button
+                onClick={handleSaveItems}
+                disabled={loading}
+                className="btn btn-primary"
+                style={{ flex: 1, fontSize: '1.125rem' }}
+              >
+                {loading ? "Saving..." : `Save ${scannedItems.length} Items to Pantry`}
+              </button>
+              <button
+                onClick={clearSelection}
+                className="btn btn-secondary"
+                style={{ paddingLeft: '1.5rem', paddingRight: '1.5rem' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Messages */}
         {message && (
-          <div className={`p-4 rounded-lg flex items-center gap-3 ${isSuccess ? 'bg-green-500/10 border border-green-500/20 text-green-400' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
+          <div 
+            className="glass-panel"
+            style={{ 
+              padding: '1rem', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.75rem',
+              backgroundColor: isSuccess ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+              borderColor: isSuccess ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+              color: isSuccess ? 'var(--success)' : 'var(--danger)'
+            }}
+          >
             {isSuccess ? <Check size={20} /> : <X size={20} />}
             <span>{displayMessage}</span>
           </div>

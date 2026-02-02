@@ -18,3 +18,7 @@ export async function verifyToken(
     res.status(401).json({ error: "Invalid token" });
   }
 }
+
+// Alias for consistency
+export const authMiddleware = verifyToken;
+

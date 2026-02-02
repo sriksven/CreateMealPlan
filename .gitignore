@@ -14,7 +14,8 @@ dist-ssr
 serviceAccountKey.json
 backend/src/config/serviceAccountKey.json
 .env
-
+.python-version
+backend/.env
 
 # Editor directories and files
 .vscode/*
