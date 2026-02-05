@@ -38,8 +38,8 @@ const MyPantry: React.FC = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [addForm, setAddForm] = useState({
         name: '',
-        quantity: '',
-        unit: '',
+        weight: '',
+        weightUnit: '',
         count: '',
     });
     const [addError, setAddError] = useState('');
@@ -162,14 +162,14 @@ const MyPantry: React.FC = () => {
             setAddError('Item name is required');
             return;
         }
-        
-        if (!addForm.quantity && !addForm.count) {
-            setAddError('Please enter either quantity or count');
+
+        if (!addForm.weight && !addForm.count) {
+            setAddError('Please enter either weight or count');
             return;
         }
 
-        if (addForm.quantity && !addForm.unit) {
-            setAddError('Please specify a unit (kg, lbs, oz, etc.)');
+        if (addForm.weight && !addForm.weightUnit) {
+            setAddError('Please specify a unit for the weight');
             return;
         }
 
@@ -182,13 +182,13 @@ const MyPantry: React.FC = () => {
 
             const payload: any = {
                 name: addForm.name,
-                quantity: addForm.quantity || addForm.count,
-                unit: addForm.unit || (addForm.count ? 'count' : 'item'),
+                weight: addForm.weight,
+                weightUnit: addForm.weightUnit,
+                count: addForm.count,
+                // Legacy fallbacks (optional but good for safety)
+                quantity: addForm.weight || addForm.count,
+                unit: addForm.weightUnit || (addForm.count ? 'item' : ''),
             };
-
-            if (addForm.count) {
-                payload.count = addForm.count;
-            }
 
             const res = await fetch(`${API_BASE_URL}/api/pantry/item`, {
                 method: 'POST',
@@ -202,9 +202,9 @@ const MyPantry: React.FC = () => {
             if (!res.ok) throw new Error('Failed to add item');
 
             // Reset form and close modal
-            setAddForm({ name: '', quantity: '', unit: '', count: '' });
+            setAddForm({ name: '', weight: '', weightUnit: '', count: '' });
             setShowAddModal(false);
-            
+
             // Refresh pantry items
             fetchPantryItems();
         } catch (error) {
@@ -236,7 +236,7 @@ const MyPantry: React.FC = () => {
                         {totalItems} items in your pantry
                     </p>
                 </div>
-                <button 
+                <button
                     className="btn btn-primary btn-sm"
                     onClick={() => setShowAddModal(true)}
                 >
@@ -323,13 +323,24 @@ const MyPantry: React.FC = () => {
                                                             className="input-field"
                                                             style={{ width: '80px' }}
                                                         />
-                                                        <input
-                                                            type="text"
+                                                        <select
                                                             value={editForm.unit || ''}
                                                             onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })}
                                                             className="input-field"
-                                                            style={{ width: '80px' }}
-                                                        />
+                                                            style={{ width: '100px' }}
+                                                        >
+                                                            <option value="">Unit</option>
+                                                            <option value="kg">kg</option>
+                                                            <option value="g">g</option>
+                                                            <option value="lb">lb</option>
+                                                            <option value="oz">oz</option>
+                                                            <option value="L">L</option>
+                                                            <option value="ml">ml</option>
+                                                            <option value="cup">cup</option>
+                                                            <option value="tbsp">tbsp</option>
+                                                            <option value="tsp">tsp</option>
+                                                            <option value="item">item</option>
+                                                        </select>
                                                     </div>
                                                     <div style={{ display: 'flex', gap: '0.5rem', marginLeft: '0.5rem' }}>
                                                         <button
@@ -402,7 +413,7 @@ const MyPantry: React.FC = () => {
 
             {/* Add Item Modal */}
             {showAddModal && (
-                <div 
+                <div
                     style={{
                         position: 'fixed',
                         top: 0,
@@ -418,7 +429,7 @@ const MyPantry: React.FC = () => {
                     }}
                     onClick={() => setShowAddModal(false)}
                 >
-                    <div 
+                    <div
                         className="glass-panel"
                         style={{
                             maxWidth: '500px',
@@ -432,7 +443,7 @@ const MyPantry: React.FC = () => {
                             <button
                                 onClick={() => {
                                     setShowAddModal(false);
-                                    setAddForm({ name: '', quantity: '', unit: '', count: '' });
+                                    setAddForm({ name: '', weight: '', weightUnit: '', count: '' });
                                     setAddError('');
                                 }}
                                 className="btn btn-sm"
@@ -458,28 +469,34 @@ const MyPantry: React.FC = () => {
                                 />
                             </div>
 
-                            {/* Quantity and Unit */}
+                            {/* Weight / Volume */}
                             <div>
                                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
-                                    Quantity & Unit
+                                    Weight / Volume
                                 </label>
                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                                     <input
                                         type="text"
-                                        value={addForm.quantity}
-                                        onChange={(e) => setAddForm({ ...addForm, quantity: e.target.value })}
+                                        value={addForm.weight}
+                                        onChange={(e) => setAddForm({ ...addForm, weight: e.target.value })}
                                         className="input-field"
-                                        placeholder="1.5"
+                                        placeholder="e.g. 500"
                                         style={{ flex: 1 }}
                                     />
-                                    <input
-                                        type="text"
-                                        value={addForm.unit}
-                                        onChange={(e) => setAddForm({ ...addForm, unit: e.target.value })}
+                                    <select
+                                        value={addForm.weightUnit}
+                                        onChange={(e) => setAddForm({ ...addForm, weightUnit: e.target.value })}
                                         className="input-field"
-                                        placeholder="kg, lbs, oz"
                                         style={{ flex: 1 }}
-                                    />
+                                    >
+                                        <option value="">Select unit</option>
+                                        <option value="kg">kg (kilograms)</option>
+                                        <option value="g">g (grams)</option>
+                                        <option value="lb">lb (pounds)</option>
+                                        <option value="oz">oz (ounces)</option>
+                                        <option value="L">L (liters)</option>
+                                        <option value="ml">ml (milliliters)</option>
+                                    </select>
                                 </div>
                             </div>
 
@@ -507,10 +524,10 @@ const MyPantry: React.FC = () => {
 
                             {/* Error Message */}
                             {addError && (
-                                <div 
+                                <div
                                     className="glass-panel"
-                                    style={{ 
-                                        padding: '0.75rem', 
+                                    style={{
+                                        padding: '0.75rem',
                                         backgroundColor: 'rgba(239, 68, 68, 0.1)',
                                         borderColor: 'rgba(239, 68, 68, 0.2)',
                                         color: 'var(--danger)',
@@ -534,7 +551,7 @@ const MyPantry: React.FC = () => {
                                 <button
                                     onClick={() => {
                                         setShowAddModal(false);
-                                        setAddForm({ name: '', quantity: '', unit: '', count: '' });
+                                        setAddForm({ name: '', weight: '', weightUnit: '', count: '' });
                                         setAddError('');
                                     }}
                                     className="btn btn-secondary"

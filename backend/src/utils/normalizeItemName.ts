@@ -1,13 +1,7 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+import groq from "../config/groq";
 
 export async function normalizeItemName(itemName: string): Promise<string> {
   try {
-    const model = genAI.getGenerativeModel({ 
-      model: process.env.GEMINI_MODEL || "gemini-2.5-flash" 
-    });
-
     const prompt = `You are a food item name normalizer. Given a food item name (which may have typos, plural/singular variations, or different spellings), return ONLY the standardized, singular form of the item name in proper case.
 
 Examples:
@@ -23,10 +17,15 @@ Input: "${itemName}"
 
 Return ONLY the corrected name, nothing else:`;
 
-    const result = await model.generateContent(prompt);
-    const response = result.response.text().trim();
-    
-    // Remove any quotes or extra formatting
+    const completion = await groq.chat.completions.create({
+      messages: [{ role: "user", content: prompt }],
+      model: "llama-3.3-70b-versatile",
+      temperature: 0.1,
+    });
+
+    const response = completion.choices[0]?.message?.content?.trim() || itemName;
+
+    // Remove any quotes or extra formatting that might sneak in
     return response.replace(/['"]/g, '').trim();
   } catch (error) {
     console.error("Error normalizing item name:", error);

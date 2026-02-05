@@ -4,6 +4,9 @@ import Recipes from './pages/Recipes';
 import MyPantry from './pages/MyPantry';
 import ReceiptScanner from './pages/ReceiptScanner';
 import Profile from './pages/Profile';
+import Subscriptions from './pages/Subscriptions';
+import AccountDetails from './pages/AccountDetails';
+import AppPreferences from './pages/AppPreferences';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import LandingPage from './pages/LandingPage';
@@ -33,6 +36,9 @@ function App() {
             <Route path="/pantry" element={<MyPantry />} />
             <Route path="/scanner" element={<ReceiptScanner />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/subscriptions" element={<Subscriptions />} />
+            <Route path="/account" element={<AccountDetails />} />
+            <Route path="/preferences" element={<AppPreferences />} />
 
             {/* Redirect old dashboard link or default authenticated view */}
             <Route path="/dashboard" element={<Navigate to="/pantry" replace />} />

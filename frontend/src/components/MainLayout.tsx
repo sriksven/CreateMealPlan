@@ -16,7 +16,7 @@ const MainLayout: React.FC = () => {
                 <div className="logo-area">
                     <ShoppingBasket color="var(--accent-primary)" size={24} />
                     <span className="text-xl text-gradient">
-                        My Pantry
+                        CreateMealPlan
                     </span>
                 </div>
 

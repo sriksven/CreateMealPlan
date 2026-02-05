@@ -3,6 +3,7 @@ import cors from "cors";
 import scannerRoutes from "./routes/scanner.routes";
 import pantryRoutes from "./routes/pantry.routes";
 import userRoutes from "./routes/user.routes";
+import historyRoutes from "./routes/history.routes";
 
 const app = express();
 
@@ -12,7 +13,17 @@ const app = express();
  */
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      // Allow any localhost origin
+      if (origin.startsWith('http://localhost:')) {
+        return callback(null, true);
+      }
+      // Block others
+      return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   })
@@ -24,6 +35,7 @@ app.use(express.json());
 app.use("/api/scanner", scannerRoutes);
 app.use("/api/pantry", pantryRoutes);
 app.use("/api/user", userRoutes);
+app.use("/api/history", historyRoutes);
 
 // Health check
 app.get("/", (_req, res) => {

@@ -109,5 +109,43 @@ CreateMealPlan/
 └── README.md                # Documentation
 ```
 
+---
+
+## 🧪 Testing
+
+This project includes comprehensive automated testing with Jest (backend) and Vitest (frontend).
+
+### Running Tests
+
+**Backend Tests**:
+```bash
+cd backend
+npm test              # Run all tests
+npm run test:watch    # Watch mode
+npm run test:coverage # Generate coverage report
+```
+
+**Frontend Tests**:
+```bash
+cd frontend
+npm test              # Run all tests
+npm run test:watch    # Watch mode
+npm run test:coverage # Generate coverage report
+```
+
+### Test Structure
+
+- **Smoke Tests**: Quick sanity checks (server starts, app renders)
+- **Unit Tests**: Testing utility functions (categorization, normalization)
+- **Integration Tests**: API endpoints and component integration
+- **CI/CD**: GitHub Actions runs all tests automatically on every push
+
+### Coverage Thresholds
+
+- Backend: 50% coverage (branches, functions, lines, statements)
+- Frontend: Comprehensive component and integration coverage
+
+---
+
 ## 🛡 License
 This project is for educational purposes.

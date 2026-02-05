@@ -8,6 +8,8 @@ interface ScannedItem {
   quantity: string;
   unit: string;
   count?: string;
+  isGrocery?: boolean;
+  confidence?: number;
 }
 
 const ReceiptScanner: React.FC = () => {
@@ -17,7 +19,12 @@ const ReceiptScanner: React.FC = () => {
   const [message, setMessage] = useState("");
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [scannedItems, setScannedItems] = useState<ScannedItem[]>([]);
+  const [confirmedItems, setConfirmedItems] = useState<ScannedItem[]>([]);
+  const [suggestedRemovals, setSuggestedRemovals] = useState<ScannedItem[]>([]);
+  const [receiptMetadata, setReceiptMetadata] = useState<any>(null);
+  const [possibleDuplicate, setPossibleDuplicate] = useState(false);
+  const [lastScannedAt, setLastScannedAt] = useState<string | null>(null);
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,7 +55,7 @@ const ReceiptScanner: React.FC = () => {
     // On desktop, use WebRTC
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { 
+        video: {
           facingMode: "environment",
           width: { ideal: 1280 },
           height: { ideal: 720 }
@@ -56,7 +63,7 @@ const ReceiptScanner: React.FC = () => {
       });
       setStream(mediaStream);
       setIsCameraOpen(true);
-      
+
       // Wait a bit for state to update, then attach stream
       setTimeout(() => {
         if (videoRef.current) {
@@ -76,14 +83,14 @@ const ReceiptScanner: React.FC = () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      
+
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      
+
       const ctx = canvas.getContext("2d");
       if (ctx) {
         ctx.drawImage(video, 0, 0);
-        
+
         canvas.toBlob((blob) => {
           if (blob) {
             const file = new File([blob], "camera-photo.jpg", { type: "image/jpeg" });
@@ -118,8 +125,13 @@ const ReceiptScanner: React.FC = () => {
     setFile(null);
     setPreview(null);
     setMessage("");
-    setScannedItems([]);
+    setConfirmedItems([]);
+    setSuggestedRemovals([]);
     setEditingIndex(null);
+    setReceiptMetadata(null);
+    setPossibleDuplicate(false);
+    setLastScannedAt(null);
+    setShowDuplicateWarning(false);
     closeCamera();
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
@@ -154,8 +166,26 @@ const ReceiptScanner: React.FC = () => {
       }
 
       const data = await res.json();
-      setScannedItems(data.items || []);
-      setMessage(`success|Found ${data.items.length} items! Review and save to pantry.`);
+      const items = data.items || [];
+
+      // Split items into confirmed groceries and suggested removals
+      const confirmed = items.filter((item: ScannedItem) => item.isGrocery !== false);
+      const suggested = items.filter((item: ScannedItem) => item.isGrocery === false);
+
+      setConfirmedItems(confirmed);
+      setSuggestedRemovals(suggested);
+      setReceiptMetadata(data.metadata);
+      setPossibleDuplicate(data.possibleDuplicate);
+      setLastScannedAt(data.lastScannedAt);
+
+      const totalFound = items.length;
+      const suggestedCount = suggested.length;
+
+      if (suggestedCount > 0) {
+        setMessage(`success|Found ${totalFound} items! ${suggestedCount} non-grocery item(s) detected for review.`);
+      } else {
+        setMessage(`success|Found ${totalFound} grocery items! Review and save to pantry.`);
+      }
     } catch (err) {
       console.error(err);
       setMessage("error|Failed to scan receipt. Please try again.");
@@ -164,26 +194,38 @@ const ReceiptScanner: React.FC = () => {
     }
   };
 
+  const initiateSave = () => {
+    if (possibleDuplicate) {
+      setShowDuplicateWarning(true);
+    } else {
+      handleSaveItems();
+    }
+  };
+
   const handleSaveItems = async () => {
-    if (scannedItems.length === 0) return;
+    if (confirmedItems.length === 0) return;
 
     setLoading(true);
+    setShowDuplicateWarning(false);
     try {
       const token = await auth.currentUser?.getIdToken();
       if (!token) throw new Error("User not authenticated");
 
-      const res = await fetch(`${API_BASE_URL}/api/pantry/items`, {
+      const res = await fetch(`${API_BASE_URL}/api/scanner/save-items`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ items: scannedItems }),
+        body: JSON.stringify({
+          items: confirmedItems,
+          metadata: receiptMetadata // Include metadata for future duplicate checks
+        }),
       });
 
       if (!res.ok) throw new Error("Failed to save items");
 
-      setMessage(`success|Added ${scannedItems.length} items to your pantry!`);
+      setMessage(`success|Added ${confirmedItems.length} items to your pantry!`);
       setTimeout(() => {
         clearSelection();
       }, 2000);
@@ -195,14 +237,26 @@ const ReceiptScanner: React.FC = () => {
     }
   };
 
-  const updateItem = (index: number, field: keyof ScannedItem, value: string) => {
-    const updated = [...scannedItems];
+  const updateConfirmedItem = (index: number, field: keyof ScannedItem, value: string) => {
+    const updated = [...confirmedItems];
     updated[index] = { ...updated[index], [field]: value };
-    setScannedItems(updated);
+    setConfirmedItems(updated);
   };
 
-  const deleteItem = (index: number) => {
-    setScannedItems(scannedItems.filter((_, i) => i !== index));
+  const deleteConfirmedItem = (index: number) => {
+    setConfirmedItems(confirmedItems.filter((_, i) => i !== index));
+  };
+
+  const approveSuggested = (index: number) => {
+    const item = suggestedRemovals[index];
+    setConfirmedItems([...confirmedItems, item]);
+    setSuggestedRemovals(suggestedRemovals.filter((_, i) => i !== index));
+  };
+
+  const rejectSuggested = (index: number) => {
+    const suggested = [...suggestedRemovals];
+    suggested.splice(index, 1);
+    setSuggestedRemovals(suggested);
   };
 
   const isSuccess = message.startsWith("success|");
@@ -296,11 +350,11 @@ const ReceiptScanner: React.FC = () => {
             <button
               onClick={handleCameraClick}
               className="btn btn-primary"
-              style={{ 
-                fontSize: '1.125rem', 
-                padding: '2rem', 
-                flexDirection: 'column', 
-                gap: '0.75rem', 
+              style={{
+                fontSize: '1.125rem',
+                padding: '2rem',
+                flexDirection: 'column',
+                gap: '0.75rem',
                 height: 'auto',
                 border: '2px solid var(--accent-primary)',
                 backgroundColor: 'rgba(59, 130, 246, 0.1)'
@@ -329,7 +383,7 @@ const ReceiptScanner: React.FC = () => {
         )}
 
         {/* Scan Action */}
-        {file && scannedItems.length === 0 && (
+        {file && confirmedItems.length === 0 && suggestedRemovals.length === 0 && (
           <button
             className="btn btn-primary"
             style={{ width: '100%', fontSize: '1.125rem', marginBottom: '1rem' }}
@@ -340,23 +394,82 @@ const ReceiptScanner: React.FC = () => {
           </button>
         )}
 
-        {/* Scanned Items List */}
-        {scannedItems.length > 0 && (
+        {/* PROMPT: Duplicate Warning Modal */}
+        {showDuplicateWarning && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div className="glass-panel" style={{ padding: '2rem', maxWidth: '400px', width: '90%' }}>
+              <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
+                <h3 className="text-xl" style={{ marginBottom: '0.5rem' }}>Duplicate Receipt?</h3>
+                <p className="text-muted">
+                  It looks like you scanned a receipt from <strong>{receiptMetadata?.merchantName || 'this merchant'}</strong> on <strong>{receiptMetadata?.date || 'this date'}</strong> before.
+                </p>
+                {lastScannedAt && (
+                  <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                    Last duplicate scan: {new Date(lastScannedAt).toLocaleDateString()}
+                  </p>
+                )}
+                <p className="text-muted" style={{ marginTop: '1rem' }}>
+                  Do you still want to add these items?
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button
+                  className="btn btn-secondary"
+                  style={{ flex: 1 }}
+                  onClick={() => setShowDuplicateWarning(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary"
+                  style={{ flex: 1 }}
+                  onClick={handleSaveItems}
+                >
+                  Yes, Add Items
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Confirmed Groceries Section - Show First */}
+        {confirmedItems.length > 0 && !showDuplicateWarning && (
           <div style={{ marginBottom: '1.5rem' }}>
-            <h3 className="text-xl" style={{ marginBottom: '1rem' }}>Scanned Items ({scannedItems.length})</h3>
+            <h3 className="text-xl" style={{ marginBottom: '1rem' }}>
+              ✅ Confirmed Groceries ({confirmedItems.length})
+            </h3>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '400px', overflowY: 'auto' }}>
-              {scannedItems.map((item, index) => (
+              {confirmedItems.map((item: ScannedItem, index: number) => (
                 <div
-                  key={index}
+                  key={`confirmed-${index}`}
                   className="glass-panel"
                   style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem' }}
                 >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{item.name}</div>
+                    <div className="text-muted" style={{ fontSize: '0.875rem' }}>
+                      {item.quantity} {item.unit}{item.count ? ` • ${item.count} count` : ''}
+                    </div>
+                  </div>
                   {editingIndex === index ? (
                     <>
                       <input
                         type="text"
                         value={item.name}
-                        onChange={(e) => updateItem(index, "name", e.target.value)}
+                        onChange={(e) => updateConfirmedItem(index, "name", e.target.value)}
                         className="input-field"
                         style={{ flex: 1 }}
                         placeholder="Item name"
@@ -364,7 +477,7 @@ const ReceiptScanner: React.FC = () => {
                       <input
                         type="text"
                         value={item.quantity}
-                        onChange={(e) => updateItem(index, "quantity", e.target.value)}
+                        onChange={(e) => updateConfirmedItem(index, "quantity", e.target.value)}
                         className="input-field"
                         style={{ width: '80px' }}
                         placeholder="Qty"
@@ -372,7 +485,7 @@ const ReceiptScanner: React.FC = () => {
                       <input
                         type="text"
                         value={item.unit}
-                        onChange={(e) => updateItem(index, "unit", e.target.value)}
+                        onChange={(e) => updateConfirmedItem(index, "unit", e.target.value)}
                         className="input-field"
                         style={{ width: '80px' }}
                         placeholder="Unit"
@@ -380,7 +493,7 @@ const ReceiptScanner: React.FC = () => {
                       <input
                         type="text"
                         value={item.count || ''}
-                        onChange={(e) => updateItem(index, "count", e.target.value)}
+                        onChange={(e) => updateConfirmedItem(index, "count", e.target.value)}
                         className="input-field"
                         style={{ width: '70px' }}
                         placeholder="Count"
@@ -395,12 +508,6 @@ const ReceiptScanner: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{item.name}</div>
-                        <div className="text-muted" style={{ fontSize: '0.875rem' }}>
-                          {item.quantity} {item.unit}{item.count ? ` • ${item.count} count` : ''}
-                        </div>
-                      </div>
                       <button
                         onClick={() => setEditingIndex(index)}
                         className="btn btn-sm"
@@ -409,7 +516,7 @@ const ReceiptScanner: React.FC = () => {
                         <Edit2 size={18} />
                       </button>
                       <button
-                        onClick={() => deleteItem(index)}
+                        onClick={() => deleteConfirmedItem(index)}
                         className="btn btn-sm"
                         style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.3)', color: 'var(--danger)', padding: '0.5rem' }}
                       >
@@ -422,12 +529,12 @@ const ReceiptScanner: React.FC = () => {
             </div>
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
               <button
-                onClick={handleSaveItems}
+                onClick={initiateSave}
                 disabled={loading}
                 className="btn btn-primary"
                 style={{ flex: 1, fontSize: '1.125rem' }}
               >
-                {loading ? "Saving..." : `Save ${scannedItems.length} Items to Pantry`}
+                {loading ? "Saving..." : `Save ${confirmedItems.length} Items to Pantry`}
               </button>
               <button
                 onClick={clearSelection}
@@ -440,14 +547,99 @@ const ReceiptScanner: React.FC = () => {
           </div>
         )}
 
+        {/* Suggested Removals Section - Show Below Save Button */}
+        {suggestedRemovals.length > 0 && (
+          <div style={{ marginBottom: '1.5rem' }}>
+            <h3 className="text-xl" style={{ marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
+              Items That Don't Belong in Pantry ({suggestedRemovals.length})
+            </h3>
+            <p className="text-muted" style={{ marginBottom: '1rem', fontSize: '0.875rem' }}>
+              These items don't appear to be groceries. Move to pantry or delete?
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '300px', overflowY: 'auto' }}>
+              {suggestedRemovals.map((item: ScannedItem, index: number) => (
+                <div
+                  key={`suggested-${index}`}
+                  className="glass-panel"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    padding: '1rem',
+                    backgroundColor: 'rgba(156, 163, 175, 0.05)',
+                    borderColor: 'rgba(156, 163, 175, 0.2)'
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{item.name}</div>
+                    <div className="text-muted" style={{ fontSize: '0.875rem' }}>
+                      {item.quantity} {item.unit}{item.count ? ` • ${item.count} count` : ''}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => approveSuggested(index)}
+                    className="btn btn-sm"
+                    title="Move to groceries"
+                    style={{
+                      backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                      border: '1px solid rgba(59, 130, 246, 0.3)',
+                      color: 'var(--accent-primary)',
+                      padding: '0.5rem',
+                      fontSize: '1.1rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem'
+                    }}
+                  >
+                    ↑ Move
+                  </button>
+                  <button
+                    onClick={() => rejectSuggested(index)}
+                    className="btn btn-sm"
+                    title="Delete item"
+                    style={{
+                      backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      color: 'var(--danger)',
+                      padding: '0.5rem'
+                    }}
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Clear All button when there are only suggestions (wrong receipt edge case) */}
+            {confirmedItems.length === 0 && (
+              <div style={{ marginTop: '1rem' }}>
+                <button
+                  onClick={clearSelection}
+                  className="btn"
+                  style={{
+                    width: '100%',
+                    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: 'var(--danger)',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <X size={20} />
+                  Reject All & Start Over
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Messages */}
         {message && (
-          <div 
+          <div
             className="glass-panel"
-            style={{ 
-              padding: '1rem', 
-              display: 'flex', 
-              alignItems: 'center', 
+            style={{
+              padding: '1rem',
+              display: 'flex',
+              alignItems: 'center',
               gap: '0.75rem',
               backgroundColor: isSuccess ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
               borderColor: isSuccess ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',

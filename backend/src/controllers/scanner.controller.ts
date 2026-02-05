@@ -1,8 +1,10 @@
 import { Request, Response } from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { addItemsToPantry } from "./pantry.controller";
+import { classifyGroceryItems } from "../utils/aiGroceryClassifier";
+import { db } from "../config/firebase";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_SCAN_API_KEY || "");
 
 export const scanReceipt = async (req: Request, res: Response) => {
   try {
@@ -15,17 +17,28 @@ export const scanReceipt = async (req: Request, res: Response) => {
     // Convert image buffer to base64
     const imageData = req.file.buffer.toString("base64");
 
-    const prompt = `Analyze this grocery receipt or food item image and extract all food items. 
-For each item, provide:
-- name: the food item name
-- quantity: the numeric amount
-- unit: the unit of measurement (e.g., kg, lbs, oz, items, count)
-- count: optional number of packages/items
+    const prompt = `Analyze this receipt image and extract the merchant details and ALL items purchased.
 
-Return ONLY a valid JSON array in this exact format, nothing else:
-[{"name":"Item Name","quantity":"1","unit":"kg","count":"2"}]
+Return ONLY a valid JSON object in this exact format:
+{
+  "merchantName": "Store Name",
+  "date": "YYYY-MM-DD" (or null if not found),
+  "totalAmount": "0.00" (or null if not found),
+  "items": [
+    {
+      "name": "Item Name (standardized singular, e.g. 'Apple' not 'Apples')",
+      "count": "5" (if discrete count available, else null),
+      "weight": "1.5" (if weight available, else null),
+      "weightUnit": "lb" (e.g. kg, g, lb, oz, else null),
+      "quantity": "1" (legacy fallback: prefer count or weight value),
+      "unit": "bag" (legacy fallback: if no weight unit)
+    }
+  ]
+}
 
-Focus on food and grocery items only. Skip non-food items like bags, receipts, etc.`;
+Extract EVERY item. 
+- Separation: If an item has both count and weight (e.g. "2 bags of 500g"), capture BOTH.
+- Accuracy: If date/total is unclear, use null.`;
 
     const result = await model.generateContent([
       prompt,
@@ -40,7 +53,7 @@ Focus on food and grocery items only. Skip non-food items like bags, receipts, e
     const response = result.response.text();
     console.log("Gemini response:", response);
 
-    // Extract JSON from response (handle markdown code blocks)
+    // Extract JSON from response
     let jsonText = response.trim();
     if (jsonText.startsWith("```json")) {
       jsonText = jsonText.replace(/```json\n?/g, "").replace(/```\n?/g, "");
@@ -48,16 +61,74 @@ Focus on food and grocery items only. Skip non-food items like bags, receipts, e
       jsonText = jsonText.replace(/```\n?/g, "");
     }
 
-    const items = JSON.parse(jsonText);
+    const data = JSON.parse(jsonText);
+    const items = data.items || [];
+    const metadata = {
+      merchantName: data.merchantName,
+      date: data.date,
+      totalAmount: data.totalAmount
+    };
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "No valid items found in the image" });
     }
 
-    res.status(200).json({ items });
-  } catch (error) {
+    // Check for duplicate receipt
+    let possibleDuplicate = false;
+    let lastScannedAt = null;
+
+    if (metadata.date && metadata.totalAmount && metadata.merchantName) {
+      const userId = (req as any).user.uid;
+
+      // Check history for similar receipt
+      // We can't do complex multiple-field where clauses without composite indexes in Firestore
+      // So we fetch by one field (e.g., date or just last 50 scans) and filter in memory
+      const historySnapshot = await db.collection("pantry_history")
+        .where("uid", "==", userId)
+        .where("source", "==", "receipt")
+        .limit(50)
+        .get();
+
+      historySnapshot.docs.forEach((doc: any) => {
+        const historyData = doc.data();
+        if (historyData.metadata) {
+          if (
+            historyData.metadata.date === metadata.date &&
+            historyData.metadata.totalAmount === metadata.totalAmount &&
+            historyData.metadata.merchantName === metadata.merchantName
+          ) {
+            possibleDuplicate = true;
+            lastScannedAt = historyData.timestamp;
+          }
+        }
+      });
+    }
+
+    // Use AI to classify items in batch
+    console.log("Classifying items with AI...");
+    const itemNames = items.map((item: any) => item.name);
+    const classifications = await classifyGroceryItems(itemNames);
+
+    // Combine items with their classifications
+    const classifiedItems = items.map((item: any, index: number) => ({
+      ...item,
+      isGrocery: classifications[index].isGrocery,
+      confidence: classifications[index].confidence,
+    }));
+
+    res.status(200).json({
+      items: classifiedItems,
+      metadata,
+      possibleDuplicate,
+      lastScannedAt
+    });
+  } catch (error: any) {
     console.error("Error scanning receipt:", error);
-    res.status(500).json({ error: "Failed to scan receipt" });
+    const errorMessage = error.message || "Unknown error";
+    res.status(500).json({
+      error: "Failed to scan receipt",
+      details: errorMessage
+    });
   }
 };
 
@@ -70,6 +141,7 @@ export const saveScannedItems = async (req: Request, res: Response) => {
     }
 
     // Use the pantry controller to save items
+    req.body.source = 'receipt';
     await addItemsToPantry(req, res);
   } catch (error) {
     console.error("Error saving scanned items:", error);
