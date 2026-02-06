@@ -1,22 +1,24 @@
 import { normalizeItemName } from '../../utils/normalizeItemName';
 
-// Mock the Gemini API
-jest.mock('@google/generative-ai', () => ({
-    GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
-        getGenerativeModel: jest.fn().mockReturnValue({
-            generateContent: jest.fn().mockResolvedValue({
-                response: {
-                    text: jest.fn().mockReturnValue('apple'),
-                },
-            }),
-        }),
-    })),
+// Mock the Groq API (updated from Gemini)
+jest.mock('../../config/groq', () => ({
+    chat: {
+        completions: {
+            create: jest.fn().mockResolvedValue({
+                choices: [{
+                    message: {
+                        content: 'Apple'
+                    }
+                }]
+            })
+        }
+    }
 }));
 
 describe('normalizeItemName', () => {
     test('should normalize basic item names', async () => {
         const result = await normalizeItemName('apples');
-        expect(result).toBe('apple');
+        expect(result).toBe('Apple');
     });
 
     test('should handle empty strings', async () => {

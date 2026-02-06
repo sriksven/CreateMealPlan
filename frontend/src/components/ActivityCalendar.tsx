@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Scan, Edit3 } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { auth } from "../firebase";
 
 const API_BASE_URL = "http://localhost:8000";
@@ -17,7 +17,6 @@ interface ActivityCalendarProps {
 export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({ onDateClick, selectedDate }) => {
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [calendar, setCalendar] = useState<Record<string, CalendarData>>({});
-    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         loadCalendar();
@@ -28,9 +27,6 @@ export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({ onDateClick,
             // Fetch calendar data for current month
             const startDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
             const endDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
-
-            // Adjust to properly cover full weeks if needed, for now just month boundaries
-            // actually let's fetch a bit of buffer to be safe or strictly obey month view
 
             const token = await auth.currentUser?.getIdToken();
             if (!token) return;
@@ -46,8 +42,6 @@ export const ActivityCalendar: React.FC<ActivityCalendarProps> = ({ onDateClick,
             }
         } catch (err) {
             console.error("Failed to load calendar:", err);
-        } finally {
-            setLoading(false);
         }
     };
 

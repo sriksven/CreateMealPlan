@@ -4,6 +4,8 @@ import scannerRoutes from "./routes/scanner.routes";
 import pantryRoutes from "./routes/pantry.routes";
 import userRoutes from "./routes/user.routes";
 import historyRoutes from "./routes/history.routes";
+import recipesRoutes from "./routes/recipes.routes";
+import nutritionRoutes from "./routes/nutrition.routes";
 
 const app = express();
 
@@ -35,6 +37,8 @@ app.use(express.json());
 app.use("/api/scanner", scannerRoutes);
 app.use("/api/pantry", pantryRoutes);
 app.use("/api/user", userRoutes);
+app.use("/api/recipes", recipesRoutes);
+app.use("/api/nutrition", nutritionRoutes);
 app.use("/api/history", historyRoutes);
 
 // Health check

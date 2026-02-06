@@ -86,24 +86,31 @@ export const getHistoryByDate = async (req: Request, res: Response) => {
         if (!uid) return res.status(401).json({ error: "Unauthorized" });
 
         const { date } = req.params;
-        const startOfDay = new Date(date as string);
-        startOfDay.setHours(0, 0, 0, 0);
+        const targetDate = date as string;
 
-        const endOfDay = new Date(date as string);
-        endOfDay.setHours(23, 59, 59, 999);
-
+        // Fetch recent history (limit 100 or higher if needed)
+        // We avoid range query on timestamp to prevent index errors
         const snapshot = await db
             .collection("pantry_history")
             .where("uid", "==", uid)
-            .where("timestamp", ">=", startOfDay)
-            .where("timestamp", "<=", endOfDay)
+            // .orderBy("timestamp", "desc") // Removed to avoid index error
+            .limit(100)
             .get();
 
-        const history = snapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-            timestamp: doc.data().timestamp?.toDate?.()?.toISOString() || doc.data().timestamp,
-        }));
+        const history = snapshot.docs
+            .map((doc) => {
+                const data = doc.data();
+                const timestamp = data.timestamp?.toDate?.() || new Date(data.timestamp);
+                const dateStr = timestamp.toISOString().split("T")[0]; // YYYY-MM-DD
+                return {
+                    id: doc.id,
+                    ...data,
+                    timestamp: timestamp.toISOString(),
+                    dateStr
+                };
+            })
+            // Filter exactly for the requested date (YYYY-MM-DD)
+            .filter(item => item.dateStr === targetDate);
 
         res.json({ history });
     } catch (error) {

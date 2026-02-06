@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authMiddleware } from "../middleware/auth";
-import { getProfile, updateProfile, resetUserData } from "../controllers/user.controller";
+import { getProfile, updateProfile, resetUserData, analyzeBiometrics } from "../controllers/user.controller";
 
 const router = Router();
 
@@ -9,6 +9,9 @@ router.get("/profile", authMiddleware, getProfile);
 
 // Update user profile (protein target, tags, etc.)
 router.patch("/profile", authMiddleware, updateProfile);
+
+// Analyze biometrics
+router.post("/analyze", authMiddleware, analyzeBiometrics);
 
 // Reset user data (pantry items, history)
 router.delete("/data", authMiddleware, resetUserData);
