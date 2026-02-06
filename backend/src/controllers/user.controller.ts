@@ -26,7 +26,7 @@ export const getProfile = async (req: any, res: Response) => {
 export const updateProfile = async (req: any, res: Response) => {
   try {
     const userId = req.user.uid;
-    const { proteinTarget, tags } = req.body;
+    const { proteinTarget, tags, gender, weight, height } = req.body;
     const updateData: any = { updatedAt: new Date() };
 
     if (proteinTarget !== undefined) {
@@ -36,12 +36,25 @@ export const updateProfile = async (req: any, res: Response) => {
       updateData.proteinTarget = proteinTarget;
     }
 
+    const { calorieTarget } = req.body;
+    if (calorieTarget !== undefined) {
+      const cal = Number(calorieTarget);
+      if (typeof cal !== "number" || cal < 500 || cal > 10000) {
+        return res.status(400).json({ error: "Invalid calorie target" });
+      }
+      updateData.calorieTarget = cal;
+    }
+
     if (tags !== undefined) {
       if (!Array.isArray(tags)) {
         return res.status(400).json({ error: "Tags must be an array" });
       }
       updateData.tags = tags;
     }
+
+    if (gender) updateData.gender = gender;
+    if (weight) updateData.weight = Number(weight);
+    if (height) updateData.height = Number(height);
 
     await db.collection("users").doc(userId).set(updateData, { merge: true });
 
@@ -112,5 +125,59 @@ export const resetUserData = async (req: any, res: Response) => {
   } catch (err) {
     console.error("Reset data error:", err);
     res.status(500).json({ error: "Failed to reset data" });
+  }
+};
+
+// Analyze biometrics using Groq
+import groq from "../config/groq";
+
+export const analyzeBiometrics = async (req: Request, res: Response) => {
+  try {
+    const { gender, weight, height, age } = req.body;
+
+    if (!weight || !height || !gender) {
+      return res.status(400).json({ error: "Missing biometrics (weight, height, gender)" });
+    }
+
+    const prompt = `
+      As a Nutritionist AI, analyze this profile:
+      - Gender: ${gender}
+      - Weight: ${weight} kg
+      - Height: ${height} cm
+      ${age ? `- Age: ${age}` : ''}
+
+      1. Calculate BMI and determine status (Underweight, Normal, Overweight, Obese).
+      2. Suggest an Ideal Weight Range.
+      3. Recommend Daily Protein Target (g) for a healthy lifestyle.
+      4. Suggest Daily Calorie Target for maintenance.
+
+      Return ONLY valid JSON:
+      {
+        "bmi": number,
+        "status": "string", // e.g. "Overweight"
+        "idealWeightRange": "string", // e.g. "65-72 kg"
+        "proteinTarget": number,
+        "calorieTarget": number,
+        "tip": "string" // A brief, encouraging 1-sentence tip
+      }
+    `;
+
+    const chatCompletion = await groq.chat.completions.create({
+      messages: [{ role: "user", content: prompt }],
+      model: "llama-3.3-70b-versatile",
+      temperature: 0.5,
+      response_format: { type: "json_object" }
+    });
+
+    const responseContent = chatCompletion.choices[0]?.message?.content;
+    const data = responseContent ? JSON.parse(responseContent) : null;
+
+    if (!data) throw new Error("No data received from AI");
+
+    res.json(data);
+
+  } catch (err) {
+    console.error("AI Analysis Error:", err);
+    res.status(500).json({ error: "Failed to analyze biometrics" });
   }
 };

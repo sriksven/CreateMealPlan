@@ -166,61 +166,62 @@ const AccountDetails = () => {
                         Danger Zone
                     </h3>
 
+                    {/* Reset Data Section (First) */}
                     <p className="text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>
-                        Once you delete your account, there is no going back. Please be certain.
+                        Resetting your data will clear your pantry and history, but keep your account active.
                     </p>
-
                     <button
-                        onClick={handleDeleteAccount}
-                        className="btn btn-secondary"
+                        onClick={async () => {
+                            if (confirm("Are you SURE you want to reset all data? This cannot be undone.")) {
+                                try {
+                                    const token = await user?.getIdToken();
+                                    if (!token) return;
+
+                                    const res = await fetch(`http://localhost:8000/api/user/data`, {
+                                        method: 'DELETE',
+                                        headers: { Authorization: `Bearer ${token}` }
+                                    });
+
+                                    if (res.ok) {
+                                        alert("All data has been reset.");
+                                        window.location.reload();
+                                    } else {
+                                        alert("Failed to reset data.");
+                                    }
+                                } catch (e) {
+                                    console.error(e);
+                                    alert("Error resetting data.");
+                                }
+                            }
+                        }}
+                        className="btn w-full"
                         style={{
-                            borderColor: 'var(--danger)',
+                            backgroundColor: 'transparent',
                             color: 'var(--danger)',
-                            gap: '0.5rem'
+                            border: '1px solid var(--danger)',
+                            opacity: 0.8
                         }}
                     >
-                        <Trash2 size={18} />
-                        Delete Account
+                        Reset All Data (Keep Account)
                     </button>
 
+                    {/* Delete Account Section (Second, with divider) */}
                     <div style={{ marginTop: 'var(--spacing-md)', paddingTop: 'var(--spacing-md)', borderTop: '1px solid rgba(239, 68, 68, 0.2)' }}>
                         <p className="text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>
-                            Resetting your data will clear your pantry and history, but keep your account active.
+                            Once you delete your account, there is no going back. Please be certain.
                         </p>
                         <button
-                            onClick={async () => {
-                                if (confirm("Are you SURE you want to reset all data? This cannot be undone.")) {
-                                    try {
-                                        const token = await user?.getIdToken();
-                                        if (!token) return;
-
-                                        const res = await fetch(`http://localhost:8000/api/user/data`, {
-                                            method: 'DELETE',
-                                            headers: { Authorization: `Bearer ${token}` }
-                                        });
-
-                                        if (res.ok) {
-                                            alert("All data has been reset.");
-                                            // Optional: redirect or reload
-                                            window.location.reload();
-                                        } else {
-                                            alert("Failed to reset data.");
-                                        }
-                                    } catch (e) {
-                                        console.error(e);
-                                        alert("Error resetting data.");
-                                    }
-                                }
-                            }}
-                            className="btn w-full"
+                            onClick={handleDeleteAccount}
+                            className="btn btn-secondary"
                             style={{
-                                backgroundColor: 'transparent',
+                                borderColor: 'var(--danger)',
                                 color: 'var(--danger)',
-                                border: '1px solid var(--danger)',
-                                opacity: 0.8
+                                gap: '0.5rem',
+                                width: '100%'
                             }}
                         >
-                            Reset All Data (Keep Account)
+                            <Trash2 size={18} />
+                            Delete Account
                         </button>
                     </div>
                 </div>
