@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Search, ChevronDown, ChevronRight, Trash2, Edit2, X, Check } from 'lucide-react';
 import { auth } from '../firebase';
 import { API_BASE_URL } from '../config';
+import { convertUnit, formatConvertedValue, type MeasurementSystem } from '../utils/unitConversion';
+import { estimateWeight, formatEstimatedWeight } from '../utils/weightEstimation';
 
 interface PantryItem {
     id: string;
@@ -43,10 +45,69 @@ const MyPantry: React.FC = () => {
         count: '',
     });
     const [addError, setAddError] = useState('');
+    const [measurementUnit, setMeasurementUnit] = useState<'metric' | 'imperial'>('metric');
+
+    // Helper function to get units based on measurement system
+    const getUnitsForSystem = (system: 'metric' | 'imperial') => {
+        if (system === 'metric') {
+            return [
+                { value: 'kg', label: 'kg (kilograms)' },
+                { value: 'g', label: 'g (grams)' },
+                { value: 'L', label: 'L (liters)' },
+                { value: 'ml', label: 'ml (milliliters)' },
+                { value: 'item', label: 'item' }
+            ];
+        } else {
+            return [
+                { value: 'lb', label: 'lb (pounds)' },
+                { value: 'oz', label: 'oz (ounces)' },
+                { value: 'cup', label: 'cup' },
+                { value: 'tbsp', label: 'tbsp (tablespoons)' },
+                { value: 'tsp', label: 'tsp (teaspoons)' },
+                { value: 'item', label: 'item' }
+            ];
+        }
+    };
 
     useEffect(() => {
         fetchPantryItems();
+        loadMeasurementUnit();
     }, []);
+
+    // Auto-estimate weight when count is entered
+    useEffect(() => {
+        if (addForm.count && addForm.name && !addForm.weight) {
+            const count = parseInt(addForm.count);
+            if (!isNaN(count) && count > 0) {
+                const estimate = estimateWeight(addForm.name, count, measurementUnit as MeasurementSystem);
+                setAddForm(prev => ({
+                    ...prev,
+                    weight: estimate.estimatedWeight.toString(),
+                    weightUnit: estimate.unit
+                }));
+            }
+        }
+    }, [addForm.count, addForm.name, measurementUnit]);
+
+    const loadMeasurementUnit = async () => {
+        try {
+            const token = await auth.currentUser?.getIdToken();
+            if (!token) return;
+
+            const res = await fetch(`${API_BASE_URL}/api/user/profile`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                if (data.measurementUnit) {
+                    setMeasurementUnit(data.measurementUnit);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading measurement unit:', error);
+        }
+    };
 
     const fetchPantryItems = async () => {
         try {
@@ -157,19 +218,16 @@ const MyPantry: React.FC = () => {
     };
 
     const handleAddItem = async () => {
+        setAddError('');
+
         // Validation
         if (!addForm.name.trim()) {
-            setAddError('Item name is required');
+            setAddError('Please enter an item name');
             return;
         }
 
-        if (!addForm.weight && !addForm.count) {
-            setAddError('Please enter either weight or count');
-            return;
-        }
-
-        if (addForm.weight && !addForm.weightUnit) {
-            setAddError('Please specify a unit for the weight');
+        if (!addForm.weight || !addForm.weightUnit) {
+            setAddError('Please enter weight/volume');
             return;
         }
 
@@ -330,16 +388,11 @@ const MyPantry: React.FC = () => {
                                                             style={{ width: '100px' }}
                                                         >
                                                             <option value="">Unit</option>
-                                                            <option value="kg">kg</option>
-                                                            <option value="g">g</option>
-                                                            <option value="lb">lb</option>
-                                                            <option value="oz">oz</option>
-                                                            <option value="L">L</option>
-                                                            <option value="ml">ml</option>
-                                                            <option value="cup">cup</option>
-                                                            <option value="tbsp">tbsp</option>
-                                                            <option value="tsp">tsp</option>
-                                                            <option value="item">item</option>
+                                                            {getUnitsForSystem(measurementUnit).map(unit => (
+                                                                <option key={unit.value} value={unit.value}>
+                                                                    {unit.value}
+                                                                </option>
+                                                            ))}
                                                         </select>
                                                     </div>
                                                     <div style={{ display: 'flex', gap: '0.5rem', marginLeft: '0.5rem' }}>
@@ -375,8 +428,22 @@ const MyPantry: React.FC = () => {
                                                     </div>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                                         <div style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>
-                                                            {item.quantity} {item.unit}
-                                                            {item.count && ` (${item.count})`}
+                                                            {(() => {
+                                                                // List of count-based units that should be estimated to weight
+                                                                const countUnits = ['item', 'bag', 'box', 'package', 'can', 'bottle', 'jar'];
+
+                                                                // If item has a count-based unit, estimate weight
+                                                                if (countUnits.includes(item.unit?.toLowerCase() || '')) {
+                                                                    const count = parseInt(item.quantity) || 1;
+                                                                    const estimate = estimateWeight(item.name, count, measurementUnit as MeasurementSystem);
+                                                                    return formatEstimatedWeight(estimate);
+                                                                }
+
+                                                                // Otherwise convert normally
+                                                                const conversion = convertUnit(item.quantity, item.unit, measurementUnit as MeasurementSystem);
+                                                                return formatConvertedValue(conversion);
+                                                            })()}
+                                                            {item.count && !['item', 'bag', 'box', 'package', 'can', 'bottle', 'jar'].includes(item.unit?.toLowerCase() || '') && ` (${item.count})`}
                                                         </div>
                                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                                                             <button
@@ -472,7 +539,7 @@ const MyPantry: React.FC = () => {
                             {/* Weight / Volume */}
                             <div>
                                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
-                                    Weight / Volume
+                                    Weight / Volume *
                                 </label>
                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                                     <input
@@ -490,12 +557,11 @@ const MyPantry: React.FC = () => {
                                         style={{ flex: 1 }}
                                     >
                                         <option value="">Select unit</option>
-                                        <option value="kg">kg (kilograms)</option>
-                                        <option value="g">g (grams)</option>
-                                        <option value="lb">lb (pounds)</option>
-                                        <option value="oz">oz (ounces)</option>
-                                        <option value="L">L (liters)</option>
-                                        <option value="ml">ml (milliliters)</option>
+                                        {getUnitsForSystem(measurementUnit).filter(u => u.value !== 'item').map(unit => (
+                                            <option key={unit.value} value={unit.value}>
+                                                {unit.label}
+                                            </option>
+                                        ))}
                                     </select>
                                 </div>
                             </div>

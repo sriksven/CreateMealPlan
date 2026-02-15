@@ -33,7 +33,7 @@ const LandingPage: React.FC = () => {
                     </h1>
 
                     <p className="text-xl text-muted description">
-                        Stop wasting food. Scan your receipts, track your pantry, and generate high-protein meal plans instantly with Gemini AI.
+                        Stop wasting food. Scan your receipts, track your pantry, and generate high-protein meal plans instantly with OpenAI.
                     </p>
 
                     <div className="cta-group">
@@ -68,7 +68,7 @@ const LandingPage: React.FC = () => {
 
             {/* Footer */}
             <footer className="landing-footer">
-                <p>© {new Date().getFullYear()} CreateMealPlan. Powered by Gemini.</p>
+                <p>© {new Date().getFullYear()} CreateMealPlan. Powered by OpenAI.</p>
             </footer>
         </div>
     );

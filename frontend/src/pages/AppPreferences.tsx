@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Bell, Globe, Database } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { auth } from '../firebase';
+
+const API_BASE_URL = 'http://localhost:8000';
 
 const AppPreferences = () => {
     const navigate = useNavigate();
@@ -9,6 +12,77 @@ const AppPreferences = () => {
     const [language, setLanguage] = useState('en');
     const [measurementUnit, setMeasurementUnit] = useState('metric');
     const [autoSync, setAutoSync] = useState(true);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
+
+    // Load user preferences from backend
+    useEffect(() => {
+        const loadPreferences = async () => {
+            try {
+                const token = await auth.currentUser?.getIdToken();
+                if (!token) return;
+
+                const res = await fetch(`${API_BASE_URL}/api/user/profile`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.measurementUnit) {
+                        setMeasurementUnit(data.measurementUnit);
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading preferences:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadPreferences();
+    }, []);
+
+    // Save preferences to backend
+    const handleSavePreferences = async () => {
+        setSaving(true);
+        setSaveSuccess(false);
+
+        try {
+            const token = await auth.currentUser?.getIdToken();
+            if (!token) {
+                console.error('No auth token available');
+                alert('Please log in to save preferences');
+                return;
+            }
+
+            console.log('Saving measurement unit:', measurementUnit);
+
+            const response = await fetch(`${API_BASE_URL}/api/user/profile`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({ measurementUnit })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error('Save failed:', errorData);
+                throw new Error(errorData.error || 'Failed to save');
+            }
+
+            console.log('Measurement unit saved successfully');
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 3000);
+        } catch (error) {
+            console.error('Error saving preferences:', error);
+            alert('Failed to save preferences. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
 
     return (
         <div className="page-content">
@@ -99,6 +173,7 @@ const AppPreferences = () => {
                             className="input-field"
                             value={measurementUnit}
                             onChange={(e) => setMeasurementUnit(e.target.value)}
+                            disabled={loading || saving}
                         >
                             <option value="metric">Metric (kg, g, ml)</option>
                             <option value="imperial">Imperial (lb, oz, cup)</option>
@@ -145,6 +220,35 @@ const AppPreferences = () => {
 
                     <button className="btn btn-secondary w-full">
                         Clear Cache
+                    </button>
+                </div>
+
+                {/* Save Button */}
+                <div className="glass-panel animate-fade-in-up" style={{
+                    animationDelay: '0.4s',
+                    marginTop: 'var(--spacing-lg)'
+                }}>
+                    {saveSuccess && (
+                        <div style={{
+                            padding: 'var(--spacing-sm)',
+                            marginBottom: 'var(--spacing-md)',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            borderRadius: 'var(--border-radius)',
+                            color: 'var(--success)',
+                            textAlign: 'center',
+                            fontSize: '0.9rem'
+                        }}>
+                            ✓ Preferences saved successfully!
+                        </div>
+                    )}
+                    <button
+                        onClick={handleSavePreferences}
+                        disabled={saving || loading}
+                        className="btn btn-primary w-full"
+                        style={{ fontSize: '1rem', padding: '0.875rem' }}
+                    >
+                        {saving ? 'Saving...' : 'Save Preferences'}
                     </button>
                 </div>
             </div>
