@@ -1,10 +1,8 @@
 import { Request, Response } from "express";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import openai from "../config/openai";
 import { addItemsToPantry } from "./pantry.controller";
 import { classifyGroceryItems } from "../utils/aiGroceryClassifier";
 import { db } from "../config/firebase";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_SCAN_API_KEY || "");
 
 export const scanReceipt = async (req: Request, res: Response) => {
   try {
@@ -12,7 +10,7 @@ export const scanReceipt = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "No image file provided" });
     }
 
-    const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-2.5-flash" });
+    const model = process.env.OPENAI_MODEL || "gpt-4o";
 
     // Convert image buffer to base64
     const imageData = req.file.buffer.toString("base64");
@@ -40,18 +38,28 @@ Extract EVERY item.
 - Separation: If an item has both count and weight (e.g. "2 bags of 500g"), capture BOTH.
 - Accuracy: If date/total is unclear, use null.`;
 
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          mimeType: req.file.mimetype,
-          data: imageData,
+    const result = await openai.chat.completions.create({
+      model: model,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${req.file.mimetype};base64,${imageData}`,
+              },
+            },
+          ],
         },
-      },
-    ]);
+      ],
+      response_format: { type: "json_object" },
+    });
 
-    const response = result.response.text();
-    console.log("Gemini response:", response);
+    const response = result.choices[0].message.content || "{}";
+    console.log("OpenAI response:", response);
+
 
     // Extract JSON from response
     let jsonText = response.trim();

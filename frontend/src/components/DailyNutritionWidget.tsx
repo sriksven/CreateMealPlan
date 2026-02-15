@@ -7,6 +7,7 @@ const API_BASE_URL = "http://localhost:8000";
 export const DailyNutritionWidget: React.FC = () => {
     const [stats, setStats] = useState({ calories: 0, protein: 0 });
     const [targets, setTargets] = useState({ calories: 2000, protein: 150 });
+    const [tags, setTags] = useState<string[]>([]);
     const [currentTime, setCurrentTime] = useState(new Date());
 
     useEffect(() => {
@@ -30,6 +31,7 @@ export const DailyNutritionWidget: React.FC = () => {
             const data = await res.json();
             if (data.proteinTarget) setTargets(prev => ({ ...prev, protein: data.proteinTarget }));
             if (data.calorieTarget) setTargets(prev => ({ ...prev, calories: data.calorieTarget }));
+            if (data.tags) setTags(data.tags);
         } catch (e) {
             console.error(e);
         }
@@ -139,6 +141,30 @@ export const DailyNutritionWidget: React.FC = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Dietary Preferences */}
+                {tags.length > 0 && (
+                    <div className="pt-4 border-t border-white/5">
+                        <div className="text-xs text-muted uppercase tracking-wider mb-3 font-semibold">
+                            Dietary Preferences
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {tags.map((tag) => (
+                                <span
+                                    key={tag}
+                                    className="px-3 py-1.5 rounded-full text-xs font-medium"
+                                    style={{
+                                        background: 'rgba(59, 130, 246, 0.2)',
+                                        color: '#60a5fa',
+                                        border: '1px solid rgba(59, 130, 246, 0.3)'
+                                    }}
+                                >
+                                    {tag}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

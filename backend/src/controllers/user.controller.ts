@@ -11,6 +11,7 @@ export const getProfile = async (req: any, res: Response) => {
     if (!snap.exists) {
       await ref.set({
         proteinTarget: 140,
+        measurementUnit: 'metric',
         createdAt: new Date()
       });
     }
@@ -26,7 +27,7 @@ export const getProfile = async (req: any, res: Response) => {
 export const updateProfile = async (req: any, res: Response) => {
   try {
     const userId = req.user.uid;
-    const { proteinTarget, tags, gender, weight, height } = req.body;
+    const { proteinTarget, tags, gender, weight, height, measurementUnit } = req.body;
     const updateData: any = { updatedAt: new Date() };
 
     if (proteinTarget !== undefined) {
@@ -55,6 +56,15 @@ export const updateProfile = async (req: any, res: Response) => {
     if (gender) updateData.gender = gender;
     if (weight) updateData.weight = Number(weight);
     if (height) updateData.height = Number(height);
+
+    if (measurementUnit !== undefined) {
+      console.log('Received measurementUnit:', measurementUnit);
+      if (measurementUnit !== 'metric' && measurementUnit !== 'imperial') {
+        return res.status(400).json({ error: "Invalid measurement unit. Must be 'metric' or 'imperial'" });
+      }
+      updateData.measurementUnit = measurementUnit;
+      console.log('Setting measurementUnit to:', measurementUnit);
+    }
 
     await db.collection("users").doc(userId).set(updateData, { merge: true });
 

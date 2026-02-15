@@ -74,10 +74,10 @@ export const PantryCalendar: React.FC = () => {
                 <button
                     key={dateStr}
                     onClick={() => handleDateClick(dateStr)}
-                    style={{ background: activity ? 'rgba(255,255,255,0.05)' : 'transparent', border: 'none', cursor: activity ? 'pointer' : 'default' }}
+                    style={{ background: activity ? 'rgba(59, 130, 246, 0.15)' : 'transparent', border: 'none', cursor: activity ? 'pointer' : 'default' }}
                     className={`
                         relative flex flex-col items-center justify-center w-9 h-9 rounded-lg transition-colors
-                        ${activity ? 'hover:bg-white/10' : 'opacity-30'}
+                        ${activity ? 'hover:bg-blue-500/20' : 'opacity-30'}
                     `}
                 >
                     <span className="text-xs text-muted">{d}</span>

@@ -3,6 +3,7 @@ import MainLayout from './components/MainLayout';
 import Recipes from './pages/Recipes';
 import MyPantry from './pages/MyPantry';
 import ReceiptScanner from './pages/ReceiptScanner';
+import ShoppingList from './pages/ShoppingList';
 import Profile from './pages/Profile';
 import Subscriptions from './pages/Subscriptions';
 import AccountDetails from './pages/AccountDetails';
@@ -36,6 +37,7 @@ function App() {
             <Route path="/pantry" element={<MyPantry />} />
             <Route path="/scanner" element={<ReceiptScanner />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/shopping-list" element={<ShoppingList />} />
             <Route path="/subscriptions" element={<Subscriptions />} />
             <Route path="/account" element={<AccountDetails />} />
             <Route path="/preferences" element={<AppPreferences />} />

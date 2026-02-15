@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { ShoppingBasket, ScanLine, User, UtensilsCrossed, LogOut } from 'lucide-react';
+import { ShoppingBasket, ScanLine, User, UtensilsCrossed, LogOut, ShoppingCart } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const MainLayout: React.FC = () => {
@@ -33,6 +33,10 @@ const MainLayout: React.FC = () => {
                     <Link to="/scanner" className={`nav-link ${isActive('/scanner')}`} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <ScanLine size={18} />
                         Scanner
+                    </Link>
+                    <Link to="/shopping-list" className={`nav-link ${isActive('/shopping-list')}`} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <ShoppingCart size={18} />
+                        Smart Cart
                     </Link>
                     <Link to="/profile" className={`nav-link ${isActive('/profile')}`} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <User size={18} />
@@ -75,6 +79,7 @@ const MainLayout: React.FC = () => {
                     { path: '/recipes', icon: UtensilsCrossed, label: 'Recipes' },
                     { path: '/pantry', icon: ShoppingBasket, label: 'Pantry' },
                     { path: '/scanner', icon: ScanLine, label: 'Scan' },
+                    { path: '/shopping-list', icon: ShoppingCart, label: 'Cart' },
                     { path: '/profile', icon: User, label: 'Profile' }
                 ].map(tab => (
                     <Link key={tab.path} to={tab.path} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: location.pathname === tab.path ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
